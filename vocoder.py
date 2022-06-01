@@ -1,10 +1,31 @@
 # Vocoder
 # Bart Massey 2022
 
-import math, sounddevice, sys
+import argparse, math
 import numpy as np
 import scipy.signal as ss
 import scipy.io.wavfile as wavfile
+
+ap = argparse.ArgumentParser()
+ap.add_argument(
+    "-w", "--width",
+    help="Filter width (0..1)",
+    type=float,
+    default=0.1
+)
+ap.add_argument(
+    "carrier",
+    help="Input carrier audio file.",
+)
+ap.add_argument(
+    "modulator",
+    help="Input modulator audio file.",
+)
+ap.add_argument(
+    "output",
+    help="Output audio file.",
+)
+args = ap.parse_args()
 
 # Sample rate in samples / second.
 rate = 48000
@@ -18,8 +39,8 @@ def read_wav(filename):
     return wav.astype(np.float32)
 
 
-carrier = read_wav(sys.argv[1])
-modulator = read_wav(sys.argv[2])
+carrier = read_wav(args.carrier)
+modulator = read_wav(args.modulator)
 nsamples = min(len(carrier), len(modulator))
 carrier = carrier[:nsamples]
 modulator = modulator[:nsamples]
@@ -33,7 +54,10 @@ for i in range(7):
 filter_bank = [
     ss.iirfilter(
         4,
-        [center * 0.95, center * 1.05],
+        (
+            center * (1 - args.width / 2),
+            center * (1 + args.width / 2),
+        ),
         btype = 'bandpass',
         output = 'sos',
         fs = rate,
@@ -65,4 +89,4 @@ for i in range(len(filter_bank)):
 peak = np.max(np.abs(result))
 result *= 0.5 / peak
 
-wavfile.write(sys.argv[3], rate, result)
+wavfile.write(args.output, rate, result)
