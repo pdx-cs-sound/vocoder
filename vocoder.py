@@ -1,12 +1,12 @@
 # Vocoder
 # Bart Massey 2022
 
-import argparse, math, os
+import argparse, math, os, sounddevice
 import numpy as np
 import scipy.signal as ss
 import scipy.io.wavfile as wavfile
 
-ap = argparse.ArgumentParser()
+ap = argparse.ArgumentParser(description="Vocoder demo.")
 ap.add_argument(
     "-w", "--width",
     help="Filter width (0..1).",
@@ -91,18 +91,32 @@ peak_envelope = max(max(e) for e in envelope)
 for i in range(len(envelope)):
     envelope[i] = envelope[i] * 0.5 / peak_envelope
 
-result = np.zeros(nsamples)
+vocoded = np.zeros(nsamples, dtype=np.float32)
 for i in range(len(filter_bank)):
-    result += carrier_filtered[i] * envelope[i]
+    vocoded += carrier_filtered[i] * envelope[i]
 
-peak = np.max(np.abs(result))
-result *= 0.5 / peak
+peak = np.max(np.abs(vocoded))
+vocoded *= 0.5 / peak
 
 def wav_write(filename, samples):
     samples = (32767 * samples).reshape(-1, 1).astype(np.int16)
     wavfile.write(filename, rate, samples)
 
-wav_write(args.output, result)
+if args.output:
+    wav_write(args.output, vocoded)
+else:
+    nchunk = 4096
+    nvocoded = len(vocoded)
+    stream = sounddevice.OutputStream(
+        blocksize = nchunk,
+        channels = 1,
+        samplerate = rate,
+    )
+    stream.start()
+    for i in range(0, nvocoded, nchunk):
+        stream.write(vocoded[i : i + nchunk])
+    stream.stop()
+    stream.close()
 
 if args.output_intermediates:
     try:
