@@ -94,7 +94,11 @@ for i in range(len(filter_bank)):
 peak = np.max(np.abs(result))
 result *= 0.5 / peak
 
-wavfile.write(args.output, rate, result)
+def wav_write(filename, samples):
+    samples = (32767 * samples).astype(np.int16)
+    wavfile.write(filename, rate, samples)
+
+wav_write(args.output, result)
 
 if args.output_envelopes:
     try:
@@ -103,4 +107,4 @@ if args.output_envelopes:
         pass
     for i, c in enumerate(filter_centers):
         filename = f"envelopes/env{int(c)}.wav"
-        wavfile.write(filename, rate, envelope[i])
+        wav_write(filename, envelope[i])
