@@ -1,7 +1,7 @@
 # Vocoder
 # Bart Massey 2022
 
-import argparse, math
+import argparse, math, os
 import numpy as np
 import scipy.signal as ss
 import scipy.io.wavfile as wavfile
@@ -12,6 +12,11 @@ ap.add_argument(
     help="Filter width (0..1)",
     type=float,
     default=0.1
+)
+ap.add_argument(
+    "--output-envelopes",
+    help="Save envelopes as WAF files.",
+    action="store_true",
 )
 ap.add_argument(
     "carrier",
@@ -90,3 +95,12 @@ peak = np.max(np.abs(result))
 result *= 0.5 / peak
 
 wavfile.write(args.output, rate, result)
+
+if args.output_envelopes:
+    try:
+        os.mkdir("envelopes")
+    except FileExistsError:
+        pass
+    for i, c in enumerate(filter_centers):
+        filename = f"envelopes/env{int(c)}.wav"
+        wavfile.write(filename, rate, envelope[i])
