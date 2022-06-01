@@ -9,13 +9,13 @@ import scipy.io.wavfile as wavfile
 ap = argparse.ArgumentParser()
 ap.add_argument(
     "-w", "--width",
-    help="Filter width (0..1)",
+    help="Filter width (0..1).",
     type=float,
-    default=0.1
+    default=0.3
 )
 ap.add_argument(
-    "--output-envelopes",
-    help="Save envelopes as WAF files.",
+    "--output-intermediates",
+    help="Save intermediates as WAV files for debugging.",
     action="store_true",
 )
 ap.add_argument(
@@ -29,6 +29,7 @@ ap.add_argument(
 ap.add_argument(
     "output",
     help="Output audio file.",
+    nargs='?',
 )
 args = ap.parse_args()
 
@@ -41,7 +42,7 @@ def read_wav(filename):
     wrate, wav = wavfile.read(filename)
     assert rate == wrate, "need 48000 sps wave"
     assert len(np.shape(wav)) == 1, "need 1 channel wave"
-    return wav.astype(np.float32)
+    return wav.reshape(-1).astype(np.float32)
 
 
 carrier = read_wav(args.carrier)
@@ -60,8 +61,8 @@ filter_bank = [
     ss.iirfilter(
         4,
         (
-            center * (1 - args.width / 2),
-            center * (1 + args.width / 2),
+            max(1, center * (1 - args.width / 2)),
+            min(rate // 2 - 1, center * (1 + args.width / 2)),
         ),
         btype = 'bandpass',
         output = 'sos',
@@ -77,37 +78,41 @@ carrier_filtered = filtered(carrier)
 modulator_filtered = filtered(modulator)
 
 follower_filter = ss.iirfilter(
-    4,
-    50,
+    8,
+    100,
     btype = 'lowpass',
     output = 'sos',
     fs = rate,
 )
 envelope = [
-    ss.sosfilt(follower_filter, np.abs(c)) for c in carrier_filtered
+    ss.sosfilt(follower_filter, np.abs(c)) for c in modulator_filtered
 ]
 peak_envelope = max(max(e) for e in envelope)
 for i in range(len(envelope)):
-    envelope[i] = np.max(envelope[i], 0) * 0.5 / peak_envelope
+    envelope[i] = envelope[i] * 0.5 / peak_envelope
 
 result = np.zeros(nsamples)
 for i in range(len(filter_bank)):
-    result += modulator_filtered[i] * envelope[i]
+    result += carrier_filtered[i] * envelope[i]
 
 peak = np.max(np.abs(result))
 result *= 0.5 / peak
 
 def wav_write(filename, samples):
-    samples = (32767 * samples).astype(np.int16)
+    samples = (32767 * samples).reshape(-1, 1).astype(np.int16)
     wavfile.write(filename, rate, samples)
 
 wav_write(args.output, result)
 
-if args.output_envelopes:
+if args.output_intermediates:
     try:
-        os.mkdir("envelopes")
+        os.mkdir("products")
     except FileExistsError:
         pass
     for i, c in enumerate(filter_centers):
-        filename = f"envelopes/env{int(c)}.wav"
+        filename = f"products/env{int(c)}.wav"
         wav_write(filename, envelope[i])
+        filename = f"products/car{int(c)}.wav"
+        wav_write(filename, carrier_filtered[i])
+        filename = f"products/mod{int(c)}.wav"
+        wav_write(filename, modulator_filtered[i])
