@@ -86,6 +86,9 @@ follower_filter = ss.iirfilter(
 envelope = [
     ss.sosfilt(follower_filter, np.abs(c)) for c in carrier_filtered
 ]
+peak_envelope = max(max(e) for e in envelope)
+for i in range(len(envelope)):
+    envelope[i] = np.max(envelope[i], 0) * 0.5 / peak_envelope
 
 result = np.zeros(nsamples)
 for i in range(len(filter_bank)):
