@@ -108,10 +108,15 @@ envelope = [
     ss.sosfilt(follower_filter, np.abs(c)) for c in modulator_filtered
 ]
 
+def normalize(samples, peak = None):
+    if not peak:
+        peak = np.max(np.abs(samples))
+    return samples * 0.5 / peak
+
 # Normalize the envelope gain ("AGC").
 peak_envelope = max(max(np.abs(e)) for e in envelope)
 for i in range(len(envelope)):
-    envelope[i] = envelope[i] * 0.5 / peak_envelope
+    envelope[i] = normalize(envelope[i], peak = peak_envelope)
 
 # Vocode: sum up the envelope times the carrier signal
 # across all filtered frequencies to get the output signal.
@@ -120,11 +125,10 @@ for i in range(len(filter_bank)):
     vocoded += carrier_filtered[i] * envelope[i]
 
 # Normalize the output gain ("AGC").
-peak = np.max(np.abs(vocoded))
-vocoded *= 0.5 / peak
+vocoded = normalize(vocoded)
 
 def wav_write(filename, samples):
-    samples = (32767 * samples).reshape(-1, 1).astype(np.int16)
+    samples = (32767 * normalize(samples)).reshape(-1, 1).astype(np.int16)
     wavfile.write(filename, rate, samples)
 
 # Either play the output or write it to a WAV file.
