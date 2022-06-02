@@ -60,7 +60,7 @@ modulator = modulator[:nsamples]
 
 # Frequency locations of filter centers. Hardwired to
 # octaves and fifths starting at A[2] and proceeding through
-# E[8].
+# E[9].
 filter_centers = []
 for i in range(7):
     f1 = 2 ** i * 110
@@ -109,12 +109,12 @@ envelope = [
 ]
 
 # Normalize the envelope gain ("AGC").
-peak_envelope = max(max(e) for e in envelope)
+peak_envelope = max(max(np.abs(e)) for e in envelope)
 for i in range(len(envelope)):
     envelope[i] = envelope[i] * 0.5 / peak_envelope
 
-# Sum up the envelope times the carrier signal across all
-# filtered frequencies to get the output signal.
+# Vocode: sum up the envelope times the carrier signal
+# across all filtered frequencies to get the output signal.
 vocoded = np.zeros(nsamples, dtype=np.float32)
 for i in range(len(filter_bank)):
     vocoded += carrier_filtered[i] * envelope[i]
